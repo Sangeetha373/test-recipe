@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Indian Recipe Recommender</title>
+
+<style>
+:root { 
+    --primary: #ff6f00; 
+    --veg: #2ecc71; 
+    --nonveg: #e74c3c; 
+    --bg: #fff8f0; 
+}
+
+body { 
+    font-family: 'Segoe UI', sans-serif; 
+    background: var(--bg); 
+    margin: 0; 
+    padding: 20px; 
+}
+
+.container { max-width: 1100px; margin: auto; }
+
+header { text-align: center; padding: 20px; }
+h1 { margin: 0; color: #d35400; }
+
+.search-area { 
+    background: white; 
+    padding: 25px; 
+    border-radius: 15px; 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
+    margin-bottom: 30px; 
+}
+
+.controls { display: flex; gap: 10px; flex-wrap: wrap; }
+
+input { 
+    flex: 2; 
+    padding: 15px; 
+    border: 2px solid #ddd; 
+    border-radius: 8px; 
+    font-size: 16px; 
+}
+
+select { 
+    flex: 1; 
+    padding: 15px; 
+    border: 2px solid #ddd; 
+    border-radius: 8px; 
+    font-weight: bold; 
+}
+
+button { 
+    padding: 15px 30px; 
+    background: var(--primary); 
+    color: white; 
+    border: none; 
+    border-radius: 8px; 
+    cursor: pointer; 
+    font-weight: bold; 
+}
+
+button:hover { background: #e65100; }
+
+.results-grid { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+    gap: 20px; 
+}
+
+.card { 
+    background: white; 
+    border-radius: 12px; 
+    overflow: hidden; 
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05); 
+    border-bottom: 5px solid transparent; 
+}
+
+.card img { 
+    width: 100%; 
+    height: 180px; 
+    object-fit: cover; 
+}
+
+.card-content { padding: 15px; }
+
+.type-badge { 
+    font-size: 11px; 
+    padding: 4px 8px; 
+    border-radius: 4px; 
+    text-transform: uppercase; 
+    font-weight: bold; 
+    display: inline-block; 
+    margin-bottom: 10px; 
+}
+
+.veg-badge { background: #e8f5e9; color: var(--veg); }
+.nonveg-badge { background: #ffebee; color: var(--nonveg); }
+
+.match-bar { 
+    height: 6px; 
+    background: #eee; 
+    border-radius: 3px; 
+    overflow: hidden; 
+    margin-top: 5px;
+}
+
+.match-fill { height: 100%; background: var(--primary); }
+
+.loader { 
+    text-align: center; 
+    display: none; 
+    padding: 40px; 
+    font-weight: bold; 
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+<header>
+    <h1>🇮🇳 Indian Recipe Recommender</h1>
+    <p>Enter ingredients separated by commas (e.g., onion, tomato, potato)</p>
+</header>
+
+<div class="search-area">
+    <div class="controls">
+        <input type="text" id="userInput" placeholder="Enter ingredients...">
+        <select id="dietType">
+            <option value="all">All</option>
+            <option value="veg">Veg Only</option>
+            <option value="nonveg">Non-Veg Only</option>
+        </select>
+        <button onclick="findRecipes()">Find Recipes</button>
+    </div>
+</div>
+
+<div id="loader" class="loader">🔍 Finding best Indian dishes...</div>
+<div id="results" class="results-grid"></div>
+
+</div>
+
+<script>
+
+// ✅ Indian Recipe Dataset
+const recipes = [
+{
+    name: "Paneer Butter Masala",
+    type: "veg",
+    image: "https://source.unsplash.com/400x300/?paneer",
+    ingredients: ["paneer","butter","tomato","onion","garlic","cream","spices"]
+},
+{
+    name: "Aloo Gobi",
+    type: "veg",
+    image: "https://source.unsplash.com/400x300/?aloo-gobi",
+    ingredients: ["potato","cauliflower","onion","tomato","spices"]
+},
+{
+    name: "Chole Bhature",
+    type: "veg",
+    image: "https://source.unsplash.com/400x300/?chole",
+    ingredients: ["chickpeas","onion","tomato","garlic","spices","flour"]
+},
+{
+    name: "Masala Dosa",
+    type: "veg",
+    image: "https://source.unsplash.com/400x300/?dosa",
+    ingredients: ["rice","urad dal","potato","onion","spices"]
+},
+{
+    name: "Chicken Curry",
+    type: "nonveg",
+    image: "https://source.unsplash.com/400x300/?chicken-curry",
+    ingredients: ["chicken","onion","tomato","garlic","ginger","spices"]
+},
+{
+    name: "Butter Chicken",
+    type: "nonveg",
+    image: "https://source.unsplash.com/400x300/?butter-chicken",
+    ingredients: ["chicken","butter","tomato","cream","garlic","spices"]
+},
+{
+    name: "Egg Bhurji",
+    type: "nonveg",
+    image: "https://source.unsplash.com/400x300/?egg-curry",
+    ingredients: ["egg","onion","tomato","chili","spices"]
+}
+];
+
+function findRecipes() {
+
+    const input = document.getElementById("userInput").value.toLowerCase();
+    const dietType = document.getElementById("dietType").value;
+    const results = document.getElementById("results");
+    const loader = document.getElementById("loader");
+
+    if (!input) {
+        alert("Please enter ingredients!");
+        return;
+    }
+
+    results.innerHTML = "";
+    loader.style.display = "block";
+
+    const userIngredients = input.split(",").map(i => i.trim());
+
+    setTimeout(() => {
+
+        let matchedRecipes = [];
+
+        recipes.forEach(recipe => {
+
+            if (dietType !== "all" && recipe.type !== dietType) return;
+
+            let matchCount = 0;
+
+            userIngredients.forEach(ingredient => {
+                if (recipe.ingredients.includes(ingredient)) {
+                    matchCount++;
+                }
+            });
+
+            const matchPercent = Math.round((matchCount / recipe.ingredients.length) * 100);
+
+            if (matchCount > 0) {
+                matchedRecipes.push({ ...recipe, matchPercent });
+            }
+        });
+
+        matchedRecipes.sort((a,b) => b.matchPercent - a.matchPercent);
+
+        if (matchedRecipes.length === 0) {
+            results.innerHTML = "<p style='grid-column:1/-1;text-align:center;'>No matching Indian recipes found.</p>";
+        } else {
+            matchedRecipes.forEach(recipe => renderCard(recipe));
+        }
+
+        loader.style.display = "none";
+
+    }, 800);
+}
+
+function renderCard(recipe) {
+
+    const container = document.getElementById("results");
+    const card = document.createElement("div");
+    card.className = "card";
+    card.style.borderBottomColor = recipe.type === "veg" ? "var(--veg)" : "var(--nonveg)";
+
+    const badgeClass = recipe.type === "veg" ? "veg-badge" : "nonveg-badge";
+    const badgeText = recipe.type === "veg" ? "Veg" : "Non-Veg";
+
+    card.innerHTML = `
+        <img src="${recipe.image}" alt="${recipe.name}">
+        <div class="card-content">
+            <span class="type-badge ${badgeClass}">${badgeText}</span>
+            <h3>${recipe.name}</h3>
+            <p>Match: ${recipe.matchPercent}%</p>
+            <div class="match-bar">
+                <div class="match-fill" style="width:${recipe.matchPercent}%"></div>
+            </div>
+        </div>
+    `;
+
+    container.appendChild(card);
+}
+
+</script>
+
+</body>
+</html>
